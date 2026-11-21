@@ -41,7 +41,9 @@ struct VideoEntry: Identifiable, Hashable {
     let title: String
     let duration: Double?   // seconds
     let url: String
+    var videoId: String? = nil
     var isSelected: Bool = true
+    var isDownloaded: Bool = false
 
     var id: Int { index }
 }

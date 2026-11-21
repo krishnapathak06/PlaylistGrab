@@ -17,16 +17,51 @@ struct DownloadsView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                List(state.jobs) { job in
-                    JobRow(job: job)
-                        .padding(.vertical, 4)
+                VStack(spacing: 0) {
+                    if state.hasFailedJobs {
+                        HStack(spacing: 10) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(.red)
+                            Text("\(state.failedCount) download\(state.failedCount == 1 ? "" : "s") failed")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                            Spacer()
+                            Button {
+                                state.retryAllFailed()
+                            } label: {
+                                Label("Retry Failed", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.small)
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                    }
+
+                    List(state.jobs) { job in
+                        JobRow(job: job)
+                            .padding(.vertical, 4)
+                    }
+                    .listStyle(.inset)
                 }
-                .listStyle(.inset)
             }
         }
         .navigationTitle("Downloads")
         .toolbar {
             ToolbarItemGroup {
+                if state.hasFailedJobs {
+                    Button {
+                        state.retryAllFailed()
+                    } label: {
+                        Label("Retry Failed (\(state.failedCount))", systemImage: "arrow.clockwise")
+                    }
+                    .help("Retry all failed downloads")
+                }
+
                 Button {
                     NSWorkspace.shared.open(URL(fileURLWithPath: downloadFolder, isDirectory: true))
                 } label: {

@@ -19,6 +19,12 @@ struct NewDownloadView: View {
             }
         }
         .navigationTitle("New Download")
+        .onAppear {
+            state.checkExistingDownloads(in: downloadFolder)
+        }
+        .onChange(of: downloadFolder) { newFolder in
+            state.checkExistingDownloads(in: newFolder)
+        }
     }
 
     // MARK: - Top controls
@@ -72,13 +78,17 @@ struct NewDownloadView: View {
             HStack(spacing: 8) {
                 Image(systemName: "folder")
                     .foregroundStyle(.secondary)
-                Text(displayPath(downloadFolder))
+                let resolved = state.hasSource && state.sourceIsPlaylist
+                    ? state.resolvedDestination(forFolder: downloadFolder).path
+                    : downloadFolder
+                Text(displayPath(resolved))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Button("Change…") {
                     if let chosen = FolderPicker.choose(startingAt: downloadFolder) {
                         downloadFolder = chosen
+                        state.checkExistingDownloads(in: chosen)
                     }
                 }
                 Spacer()
@@ -147,6 +157,22 @@ struct NewDownloadView: View {
                             }
                             Text(entry.title)
                                 .lineLimit(1)
+                                .foregroundStyle(entry.isDownloaded ? .secondary : .primary)
+
+                            if entry.isDownloaded {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                    Text("Downloaded")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green.opacity(0.12))
+                                .clipShape(Capsule())
+                            }
+
                             Spacer()
                             Text(Fmt.duration(entry.duration))
                                 .font(.system(.body, design: .monospaced))
@@ -164,11 +190,19 @@ struct NewDownloadView: View {
 
     private var footer: some View {
         HStack(spacing: 12) {
+            if state.downloadedEntriesCount > 0 {
+                Button("Select Missing") { state.selectMissingOnly() }
+            }
             Button("Select All") { state.setAllSelected(true) }
             Button("Select None") { state.setAllSelected(false) }
             Spacer()
-            Text("\(state.selectedCount) of \(state.entries.count) selected")
-                .foregroundStyle(.secondary)
+            if state.downloadedEntriesCount > 0 {
+                Text("\(state.downloadedEntriesCount) downloaded · \(state.selectedCount) of \(state.missingEntriesCount) missing selected")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("\(state.selectedCount) of \(state.entries.count) selected")
+                    .foregroundStyle(.secondary)
+            }
             Button {
                 state.downloadSelected()
             } label: {
@@ -184,6 +218,9 @@ struct NewDownloadView: View {
     }
 
     private var downloadButtonTitle: String {
+        if state.downloadedEntriesCount > 0 && state.selectedCount == state.missingEntriesCount {
+            return "Download \(state.selectedCount) Missing"
+        }
         if state.entries.count == 1 { return "Download" }
         return "Download \(state.selectedCount)"
     }

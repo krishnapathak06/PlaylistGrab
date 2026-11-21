@@ -213,6 +213,13 @@ final class DownloadRunner: @unchecked Sendable {
         running?.terminate()
     }
 
+    func reset() {
+        lock.lock()
+        cancelled = false
+        process = nil
+        lock.unlock()
+    }
+
     /// Returns the exit status. `onLine` is called from a background thread for each output line.
     func run(executable: URL,
              arguments: [String],
@@ -342,5 +349,39 @@ final class ToolManager: ObservableObject {
         }.value
         updateStatus = "Reset to the version bundled with the app."
         await refreshVersion()
+    }
+}
+
+// MARK: - Existing file detection
+
+enum FileChecker {
+    /// Checks whether a video entry already exists as a completed media file in the list of files.
+    static func isDownloaded(entry: VideoEntry, files: [String], isPlaylist: Bool, padWidth: Int) -> Bool {
+        let prefixPad = "\(Fmt.zeroPad(entry.index, width: padWidth)) - "
+        let prefixSimple = "\(entry.index) - "
+        let cleanTitle = normalize(entry.title)
+
+        for file in files {
+            let baseName = (file as NSString).deletingPathExtension
+            if isPlaylist {
+                if baseName.hasPrefix(prefixPad) || baseName.hasPrefix(prefixSimple) {
+                    return true
+                }
+            }
+            let cleanFile = normalize(baseName)
+            if !cleanTitle.isEmpty && (cleanFile.contains(cleanTitle) || cleanTitle.contains(cleanFile)) {
+                return true
+            }
+            if let id = entry.videoId, !id.isEmpty, baseName.contains(id) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func normalize(_ s: String) -> String {
+        s.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
     }
 }

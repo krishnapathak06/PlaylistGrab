@@ -55,7 +55,8 @@ enum Fetcher {
                     index: offset + 1,
                     title: title,
                     duration: duration,
-                    url: videoURL(for: entry, id: id)))
+                    url: videoURL(for: entry, id: id),
+                    videoId: id.isEmpty ? nil : id))
             }
             guard !list.isEmpty else {
                 throw FetchError.failed("This playlist doesn’t contain any videos that can be listed.")
@@ -68,7 +69,13 @@ enum Fetcher {
         let title = (json["title"] as? String) ?? "Video"
         let duration = (json["duration"] as? NSNumber)?.doubleValue
         let url = (json["webpage_url"] as? String) ?? urlString
-        let entry = VideoEntry(index: 1, title: title, duration: duration, url: url)
+        let id = json["id"] as? String
+        let entry = VideoEntry(
+            index: 1,
+            title: title,
+            duration: duration,
+            url: url,
+            videoId: (id?.isEmpty == false) ? id : nil)
         return FetchedSource(title: title, isPlaylist: false, entries: [entry])
     }
 

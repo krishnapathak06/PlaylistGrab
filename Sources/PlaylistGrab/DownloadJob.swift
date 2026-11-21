@@ -25,7 +25,7 @@ final class DownloadJob: ObservableObject, Identifiable {
     private var stagesDone = 0
     private var cancelRequested = false
     private var lastError: String?
-    private let runner = DownloadRunner()
+    private var runner = DownloadRunner()
 
     init(entry: VideoEntry,
          mode: MediaMode,
@@ -47,6 +47,7 @@ final class DownloadJob: ObservableObject, Identifiable {
     // MARK: - Control
 
     func prepareForRun() {
+        runner.reset()
         state = .running
         progress = 0
         stagesDone = 0
@@ -71,6 +72,9 @@ final class DownloadJob: ObservableObject, Identifiable {
     }
 
     func resetForRetry() {
+        runner.reset()
+        cancelRequested = false
+        lastError = nil
         state = .queued
         progress = 0
         stagesDone = 0
@@ -133,6 +137,7 @@ final class DownloadJob: ObservableObject, Identifiable {
             "--newline",
             "--no-colors",
             "--no-mtime",
+            "--no-overwrites",
             "--retries", "10",
             "--fragment-retries", "10",
             "--concurrent-fragments", "4",
