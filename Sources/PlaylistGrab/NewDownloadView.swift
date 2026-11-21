@@ -7,15 +7,19 @@ struct NewDownloadView: View {
     @AppStorage("downloadFolder") private var downloadFolder = AppDefaults.downloadFolder
     @AppStorage("subsEnabled") private var subsEnabled = false
     @AppStorage("subLang") private var subLang = "en"
+    @AppStorage("cookieSource") private var cookieSource = CookieSourceType.browser.rawValue
 
     @State private var filterQuery = ""
 
     var body: some View {
         VStack(spacing: 0) {
             heroControlCard
-                .padding(16)
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
 
             Divider()
+                .opacity(0.6)
 
             resultsContent
 
@@ -35,17 +39,17 @@ struct NewDownloadView: View {
     // MARK: - Hero Top Card
 
     private var heroControlCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             // URL Input bar
-            HStack(spacing: 8) {
-                Image(systemName: "link")
-                    .font(.system(size: 14, weight: .semibold))
+            HStack(spacing: 10) {
+                Image(systemName: "link.badge.plus")
+                    .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(Theme.primaryAccent)
                     .padding(.leading, 6)
 
-                TextField("Paste YouTube video or playlist link…", text: $state.urlText)
+                TextField("Paste YouTube video, playlist, or album link…", text: $state.urlText)
                     .textFieldStyle(.plain)
-                    .font(.system(size: 13))
+                    .font(.system(size: 13, weight: .regular))
                     .onSubmit { state.fetch() }
 
                 if !state.urlText.isEmpty {
@@ -53,6 +57,7 @@ struct NewDownloadView: View {
                         state.urlText = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 13))
                             .foregroundStyle(.tertiary)
                     }
                     .buttonStyle(.plain)
@@ -65,43 +70,52 @@ struct NewDownloadView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "doc.on.clipboard")
+                            .font(.system(size: 11))
                         Text("Paste")
+                            .font(.system(size: 11, weight: .medium))
                     }
-                    .font(.caption.weight(.medium))
                     .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 5)
                     .background(Color.primary.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
+                .help("Paste from clipboard")
 
                 Button {
                     state.fetch()
                 } label: {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         if state.isFetching {
                             ProgressView()
                                 .controlSize(.mini)
                         } else {
-                            Image(systemName: "arrow.right")
-                                .font(.caption.weight(.bold))
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 13, weight: .bold))
                         }
-                        Text("Fetch")
-                            .fontWeight(.semibold)
+                        Text(state.isFetching ? "Fetching…" : "Fetch")
+                            .font(.system(size: 12, weight: .semibold))
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 7)
                     .background(
                         state.urlText.trimmed.isEmpty || state.isFetching
-                            ? Color.primary.opacity(0.1)
-                            : Theme.primaryAccent
+                            ? AnyShapeStyle(Color.primary.opacity(0.08))
+                            : AnyShapeStyle(Theme.accentGradient)
                     )
                     .foregroundStyle(
                         state.urlText.trimmed.isEmpty || state.isFetching
                             ? Color.secondary
                             : Color.white
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 7))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .shadow(
+                        color: state.urlText.trimmed.isEmpty || state.isFetching
+                            ? .clear
+                            : Theme.primaryAccent.opacity(0.35),
+                        radius: 4,
+                        y: 1
+                    )
                 }
                 .buttonStyle(.plain)
                 .disabled(state.urlText.trimmed.isEmpty || state.isFetching)
@@ -115,50 +129,75 @@ struct NewDownloadView: View {
             )
 
             // Configuration Bar
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 // Media Type Mode Switcher
-                HStack(spacing: 0) {
+                HStack(spacing: 2) {
                     modeButton(title: "Video", icon: "film", mode: .video)
                     modeButton(title: "Audio (MP3)", icon: "waveform", mode: .audio)
                 }
-                .background(Color.primary.opacity(0.06))
+                .padding(3)
+                .background(Color.primary.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                // Subtitle toggle & picker
-                HStack(spacing: 6) {
-                    Toggle(isOn: $subsEnabled) {
-                        Label("Subtitles", systemImage: "captions.bubble.fill")
-                            .font(.subheadline)
-                    }
-                    .toggleStyle(.checkbox)
-                    .disabled(state.mode == .audio)
-
-                    if subsEnabled && state.mode != .audio {
-                        Picker("", selection: $subLang) {
-                            ForEach(SubtitleLanguage.all) { lang in
-                                Text(lang.name).tag(lang.code)
-                            }
+                // Subtitle toggle & picker (video only)
+                if state.mode == .video {
+                    HStack(spacing: 6) {
+                        Toggle(isOn: $subsEnabled) {
+                            Label("Subtitles", systemImage: "captions.bubble.fill")
+                                .font(.system(size: 12))
                         }
-                        .labelsHidden()
-                        .frame(width: 140)
+                        .toggleStyle(.checkbox)
+
+                        if subsEnabled {
+                            Picker("", selection: $subLang) {
+                                ForEach(SubtitleLanguage.all) { lang in
+                                    Text(lang.name).tag(lang.code)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 130)
+                            .controlSize(.small)
+                        }
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color.primary.opacity(0.04))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 Spacer()
+
+                // Cookie Indicator Pill
+                Button {
+                    CookieManager.openSettings()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: CookieManager.isConfiguredAndActive ? "shield.checkmark" : "shield.slash")
+                            .font(.system(size: 11))
+                            .foregroundStyle(CookieManager.isConfiguredAndActive ? Color.green : Color.orange)
+                        Text(CookieManager.currentStatusSummary)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.cardBorder, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .help("Authentication cookies for YouTube bot protection. Click to change.")
 
                 // Destination Folder Bar
                 HStack(spacing: 6) {
                     Image(systemName: "folder.fill")
-                        .foregroundStyle(.blue.gradient)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.blue)
                     let resolved = state.hasSource && state.sourceIsPlaylist
                         ? state.resolvedDestination(forFolder: downloadFolder).path
                         : downloadFolder
                     Text(displayPath(resolved))
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -169,38 +208,39 @@ struct NewDownloadView: View {
                             state.checkExistingDownloads(in: chosen)
                         }
                     }
-                    .font(.caption.weight(.medium))
+                    .font(.system(size: 11, weight: .medium))
                     .buttonStyle(.borderless)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.primary.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.cardBorder, lineWidth: 1))
             }
         }
-        .asCard(padding: 14, cornerRadius: 12)
+        .asCard(padding: 12, cornerRadius: 12)
     }
 
     private func modeButton(title: String, icon: String, mode: MediaMode) -> some View {
         Button {
             state.mode = mode
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.caption.weight(.semibold))
+                    .font(.system(size: 11, weight: .semibold))
                 Text(title)
-                    .font(.subheadline.weight(.medium))
+                    .font(.system(size: 12, weight: .medium))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(
                 state.mode == mode
                     ? Color(nsColor: .controlBackgroundColor)
                     : Color.clear
             )
             .foregroundStyle(state.mode == mode ? .primary : .secondary)
-            .clipShape(RoundedRectangle(cornerRadius: 7))
-            .shadow(color: state.mode == mode ? Color.black.opacity(0.06) : Color.clear, radius: 2, y: 1)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .shadow(color: state.mode == mode ? Color.black.opacity(0.08) : Color.clear, radius: 2, y: 1)
         }
         .buttonStyle(.plain)
     }
@@ -214,30 +254,16 @@ struct NewDownloadView: View {
                 ProgressView()
                     .controlSize(.large)
                 VStack(spacing: 4) {
-                    Text("Fetching Media Information…")
+                    Text("Inspecting Media…")
                         .font(.headline)
-                    Text("Reading video titles, durations and playlist tracks.")
+                    Text("Fetching track titles, durations, and formats.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = state.fetchError {
-            VStack(spacing: 14) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .font(.system(size: 34))
-                    .foregroundStyle(.orange)
-                Text("Unable to Read Link")
-                    .font(.headline)
-                Text(error)
-                    .font(.subheadline)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: 440)
-                    .textSelection(.enabled)
-            }
-            .padding()
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            errorView(error: error)
         } else if !state.hasSource {
             welcomeEmptyState
         } else {
@@ -245,16 +271,84 @@ struct NewDownloadView: View {
         }
     }
 
+    // MARK: - Error View with Bot Protection helper
+
+    private func errorView(error: String) -> some View {
+        let isBot = CookieManager.isBotOrAuthError(error)
+
+        return VStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill((isBot ? Color.orange : Color.red).opacity(0.12))
+                    .frame(width: 64, height: 64)
+
+                Image(systemName: isBot ? "shield.slash.fill" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(isBot ? Color.orange : Color.red)
+            }
+
+            VStack(spacing: 6) {
+                Text(isBot ? "YouTube Bot Verification Required" : "Unable to Read Link")
+                    .font(.title3.bold())
+
+                Text(error)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: 480)
+                    .textSelection(.enabled)
+            }
+
+            HStack(spacing: 12) {
+                if isBot {
+                    Button {
+                        CookieManager.openSettings()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "gearshape.fill")
+                            Text("Configure Browser Cookies")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Theme.accentGradient)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Button {
+                    state.fetch()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Try Again")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.top, 4)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
     // MARK: - Welcome Empty State
 
     private var welcomeEmptyState: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             ZStack {
                 Circle()
                     .fill(Theme.accentGradient.opacity(0.12))
-                    .frame(width: 80, height: 80)
+                    .frame(width: 88, height: 88)
                 Image(systemName: "play.square.stack.fill")
-                    .font(.system(size: 36))
+                    .font(.system(size: 40))
                     .foregroundStyle(Theme.primaryAccent)
             }
 
@@ -265,45 +359,63 @@ struct NewDownloadView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 420)
+                    .frame(maxWidth: 440)
             }
 
+            // Feature Highlights
             HStack(spacing: 12) {
-                featurePill(icon: "sparkles", text: "Full Playlists & Singles")
-                featurePill(icon: "waveform", text: "Video or Audio MP3")
-                featurePill(icon: "captions.bubble", text: "Auto Subtitles")
-                featurePill(icon: "arrow.clockwise", text: "Resume & Skip Existing")
+                featureCard(
+                    icon: "sparkles",
+                    title: "Playlists & Albums",
+                    desc: "Grab hundreds of tracks in sequence"
+                )
+                featureCard(
+                    icon: "waveform",
+                    title: "Audio Extraction",
+                    desc: "High quality MP3 with ID3 tags"
+                )
+                featureCard(
+                    icon: "shield.checkmark",
+                    title: "Bot Guard",
+                    desc: "Bypass verification with cookies"
+                )
+                featureCard(
+                    icon: "arrow.clockwise",
+                    title: "Smart Skip",
+                    desc: "Skips already downloaded files"
+                )
             }
-            .padding(.top, 8)
+            .frame(maxWidth: 680)
+            .padding(.top, 4)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func featurePill(icon: String, text: String) -> some View {
-        HStack(spacing: 5) {
+    private func featureCard(icon: String, title: String, desc: String) -> some View {
+        VStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.caption)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundStyle(Theme.primaryAccent)
-            Text(text)
-                .font(.caption.weight(.medium))
+                .frame(width: 32, height: 32)
+                .background(Theme.primaryAccent.opacity(0.1))
+                .clipShape(Circle())
+
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+
+            Text(desc)
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Color.primary.opacity(0.04))
-        .clipShape(Capsule())
-        .overlay(Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1))
+        .padding(10)
+        .frame(maxWidth: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.cardBorder, lineWidth: 1))
     }
 
     // MARK: - Fetched Media List Area
-
-    private var filteredEntries: [Binding<VideoEntry>] {
-        if filterQuery.trimmed.isEmpty {
-            return $state.entries
-        }
-        let q = filterQuery.lowercased()
-        return $state.entries.filter { $0.wrappedValue.title.lowercased().contains(q) }
-    }
 
     private var fetchedListArea: some View {
         VStack(spacing: 0) {
@@ -311,17 +423,17 @@ struct NewDownloadView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(state.sourceTitle)
-                        .font(.headline)
+                        .font(.system(size: 14, weight: .bold))
                         .lineLimit(1)
 
                     HStack(spacing: 8) {
-                        Text(state.sourceIsPlaylist ? "\(state.entries.count) Videos" : "Single Video")
-                            .font(.caption.weight(.semibold))
+                        Text(state.sourceIsPlaylist ? "\(state.entries.count) Videos in Playlist" : "Single Video")
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(.secondary)
 
                         if state.downloadedEntriesCount > 0 {
-                            Text("•  \(state.downloadedEntriesCount) already in folder")
-                                .font(.caption)
+                            Text("•  \(state.downloadedEntriesCount) already saved")
+                                .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.green)
                         }
                     }
@@ -329,16 +441,16 @@ struct NewDownloadView: View {
 
                 Spacer()
 
-                // Filter search box if more than 6 videos
-                if state.entries.count > 6 {
+                // Filter search box
+                if state.entries.count > 4 {
                     HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                         TextField("Filter titles…", text: $filterQuery)
                             .textFieldStyle(.plain)
-                            .font(.caption)
-                            .frame(width: 120)
+                            .font(.system(size: 11))
+                            .frame(width: 130)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -364,18 +476,21 @@ struct NewDownloadView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
 
             Divider()
+                .opacity(0.6)
 
-            // Custom Styled Video Cards ScrollView
+            // Video Cards ScrollView
             ScrollView {
                 LazyVStack(spacing: 6) {
-                    ForEach(filteredEntries) { $entry in
-                        VideoEntryRow(entry: $entry, isPlaylist: state.sourceIsPlaylist)
+                    ForEach(state.entries.indices, id: \.self) { index in
+                        if filterQuery.isEmpty || state.entries[index].title.localizedCaseInsensitiveContains(filterQuery) {
+                            VideoEntryRow(entry: $state.entries[index], isPlaylist: state.sourceIsPlaylist)
+                        }
                     }
                 }
-                .padding(12)
+                .padding(14)
             }
         }
     }
@@ -386,11 +501,11 @@ struct NewDownloadView: View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(state.selectedCount) of \(state.entries.count) Selected")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.system(size: 13, weight: .semibold))
 
                 if state.downloadedEntriesCount > 0 {
                     Text("\(state.downloadedEntriesCount) previously downloaded")
-                        .font(.caption)
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -402,29 +517,29 @@ struct NewDownloadView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.down.circle.fill")
-                        .font(.headline)
+                        .font(.system(size: 14, weight: .bold))
                     Text(downloadButtonTitle)
-                        .font(.subheadline.weight(.bold))
+                        .font(.system(size: 13, weight: .bold))
                 }
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
                 .background(
                     state.selectedCount == 0
-                        ? Color.primary.opacity(0.1)
-                        : Theme.primaryAccent
+                        ? AnyShapeStyle(Color.primary.opacity(0.1))
+                        : AnyShapeStyle(Theme.accentGradient)
                 )
                 .foregroundStyle(state.selectedCount == 0 ? Color.secondary : Color.white)
                 .clipShape(RoundedRectangle(cornerRadius: 9))
                 .shadow(
-                    color: state.selectedCount == 0 ? .clear : Theme.primaryAccent.opacity(0.35),
-                    radius: 5,
+                    color: state.selectedCount == 0 ? .clear : Theme.primaryAccent.opacity(0.4),
+                    radius: 6,
                     y: 2
                 )
             }
             .buttonStyle(.plain)
             .disabled(state.selectedCount == 0)
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, 20)
         .padding(.vertical, 12)
         .background(.ultraThinMaterial)
         .overlay(
@@ -439,7 +554,7 @@ struct NewDownloadView: View {
         if state.downloadedEntriesCount > 0 && state.selectedCount == state.missingEntriesCount {
             return "Download \(state.selectedCount) Missing"
         }
-        if state.entries.count == 1 { return "Download" }
+        if state.entries.count == 1 { return "Download Video" }
         return "Download \(state.selectedCount) Videos"
     }
 
@@ -470,7 +585,7 @@ struct VideoEntryRow: View {
 
             if isPlaylist {
                 Text(String(format: "%02d", entry.index))
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .frame(width: 24, alignment: .center)
             }
@@ -487,7 +602,7 @@ struct VideoEntryRow: View {
                         .font(.system(size: 10))
                         .foregroundStyle(.green)
                     Text("Downloaded")
-                        .font(.caption2.weight(.medium))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.green)
                 }
                 .padding(.horizontal, 7)
@@ -503,29 +618,33 @@ struct VideoEntryRow: View {
                 Text(Fmt.duration(duration))
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
                     .background(Color.primary.opacity(0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 9)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 9)
                 .fill(
                     isHovered
                         ? Color.primary.opacity(0.05)
-                        : (entry.isSelected ? Color(nsColor: .controlBackgroundColor).opacity(0.7) : Color.clear)
+                        : (entry.isSelected ? Color(nsColor: .controlBackgroundColor).opacity(0.8) : Color.clear)
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 9)
                 .strokeBorder(
                     entry.isSelected ? Theme.cardBorder : Color.clear,
                     lineWidth: 1
                 )
         )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            entry.isSelected.toggle()
+        }
         .onHover { hovering in
             isHovered = hovering
         }

@@ -127,7 +127,11 @@ final class DownloadJob: ObservableObject, Identifiable {
         state = .failed
         statusText = "Failed"
         speedText = ""
-        errorText = message
+        if CookieManager.isBotOrAuthError(message) {
+            errorText = "YouTube bot check: 'Sign in to confirm you’re not a bot.' Open Settings → Authentication to pass browser cookies."
+        } else {
+            errorText = message
+        }
     }
 
     private func buildArguments() -> [String] {
@@ -152,6 +156,7 @@ final class DownloadJob: ObservableObject, Identifiable {
         if let ffmpeg = ToolPaths.ffmpegDir {
             args += ["--ffmpeg-location", ffmpeg.path]
         }
+        args += CookieManager.buildArguments()
 
         switch mode {
         case .audio:

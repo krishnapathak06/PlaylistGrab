@@ -29,6 +29,12 @@ struct DownloadsView: View {
         }
     }
 
+    private var hasBotFailure: Bool {
+        state.jobs.contains { job in
+            job.state == .failed && CookieManager.isBotOrAuthError(job.errorText ?? "")
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if state.jobs.isEmpty {
@@ -37,8 +43,14 @@ struct DownloadsView: View {
                 // Top Filter & Stat Bar
                 topStatusBar
                 Divider()
+                    .opacity(0.6)
 
-                if state.hasFailedJobs {
+                // Bot Error Alert or General Failure Banner
+                if hasBotFailure {
+                    botErrorBanner
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                } else if state.hasFailedJobs {
                     failedAlertBanner
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
@@ -101,7 +113,7 @@ struct DownloadsView: View {
             if state.activeCount > 0 {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.mini)
-                    Text("\(state.activeCount) in progress")
+                    Text("\(state.activeCount) active")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.secondary)
                 }
@@ -121,7 +133,72 @@ struct DownloadsView: View {
         }
     }
 
-    // MARK: - Failed Alert Banner
+    // MARK: - Bot Error Banner
+
+    private var botErrorBanner: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(Color.orange.opacity(0.15))
+                    .frame(width: 36, height: 36)
+                Image(systemName: "shield.slash.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(.orange)
+            }
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("YouTube Bot Verification Blocked Download")
+                    .font(.system(size: 13, weight: .bold))
+                Text("YouTube detected automated requests. Select your browser in Settings → Authentication to pass cookies.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Button {
+                    CookieManager.openSettings()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "gearshape.fill")
+                        Text("Open Cookie Settings")
+                    }
+                    .font(.system(size: 11, weight: .bold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.orange)
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    state.retryAllFailed()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Retry")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.primary.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(Color.orange.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.orange.opacity(0.25), lineWidth: 1)
+        )
+    }
+
+    // MARK: - Generic Failed Alert Banner
 
     private var failedAlertBanner: some View {
         HStack(spacing: 12) {
@@ -131,9 +208,9 @@ struct DownloadsView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(state.failedCount) download\(state.failedCount == 1 ? "" : "s") failed")
-                    .font(.subheadline.weight(.semibold))
-                Text("Click Retry Failed to resume them mid-run or re-fetch missed items.")
-                    .font(.caption)
+                    .font(.system(size: 13, weight: .semibold))
+                Text("Click Retry Failed to resume downloads.")
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
 
@@ -146,7 +223,7 @@ struct DownloadsView: View {
                     Image(systemName: "arrow.clockwise")
                     Text("Retry Failed")
                 }
-                .font(.caption.weight(.bold))
+                .font(.system(size: 11, weight: .bold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(Color.red)
@@ -216,6 +293,10 @@ struct JobCard: View {
 
     @State private var isHovered = false
 
+    private var isBotError: Bool {
+        CookieManager.isBotOrAuthError(job.errorText ?? "")
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             // Media Type Icon Badge
@@ -233,7 +314,7 @@ struct JobCard: View {
                     statusBadge
                 }
 
-                // Custom Sleek Progress Bar
+                // Sleek Custom Progress Bar
                 if job.state != .queued && !job.isFinished || job.state == .done {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -265,16 +346,30 @@ struct JobCard: View {
                     Spacer()
                 }
 
+                // Error box
                 if let error = job.errorText {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .lineLimit(2)
-                        .textSelection(.enabled)
-                        .padding(6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.red.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(error)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+
+                        if isBotError {
+                            Button {
+                                CookieManager.openSettings()
+                            } label: {
+                                Text("Open Settings → Cookies to Fix")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Color.orange)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.red.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
 
@@ -404,14 +499,14 @@ struct JobCard: View {
                 job.revealInFinder()
             } label: {
                 Image(systemName: "folder")
-                    .font(.caption.weight(.bold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 28, height: 28)
                     .background(Color.primary.opacity(0.06))
                     .clipShape(Circle())
             }
             .buttonStyle(.plain)
-            .help("Show in Finder")
+            .help("Show file in Finder")
         }
     }
 }

@@ -33,6 +33,7 @@ enum Fetcher {
         if let deno = ToolPaths.deno {
             args += ["--js-runtimes", "deno:\(deno.path)"]
         }
+        args += CookieManager.buildArguments()
         args.append(urlString)
 
         let result = await runCapture(executable: exe, arguments: args)
@@ -87,6 +88,9 @@ enum Fetcher {
 
     /// Turns yt-dlp's raw error output into one readable sentence.
     static func friendlyError(_ stderr: String) -> String {
+        if CookieManager.isBotOrAuthError(stderr) {
+            return "YouTube bot verification triggered: 'Sign in to confirm you’re not a bot.' Please enable browser cookies or import a cookies.txt file in Settings → Authentication."
+        }
         let lines = stderr
             .components(separatedBy: .newlines)
             .map { $0.trimmed }

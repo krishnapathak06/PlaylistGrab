@@ -11,6 +11,10 @@ enum AppDefaults {
         "autoUpdateYTDLP": true,
         "subsEnabled": false,
         "subLang": "en",
+        "cookieSource": CookieSourceType.browser.rawValue,
+        "cookieBrowser": SupportedBrowser.chrome.rawValue,
+        "cookieFilePath": "",
+        "cookieManualText": "",
     ]
 }
 
