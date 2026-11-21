@@ -25,6 +25,10 @@ struct ContentView: View {
                 }
             }
         }
+        .sheet(isPresented: $state.showSettings) {
+            SettingsView(initialTab: state.settingsTab)
+                .environmentObject(tools)
+        }
     }
 
     // MARK: - Sidebar
@@ -58,6 +62,28 @@ struct ContentView: View {
                     badgeCount: state.activeCount,
                     hasFailed: state.hasFailedJobs
                 )
+
+                Button {
+                    state.openSettings(tab: .cookies)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.secondary)
+                            .frame(width: 20)
+
+                        Text("Settings & Cookies")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(Color.secondary)
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.clear))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 10)
             .padding(.top, 12)
@@ -155,7 +181,7 @@ struct ContentView: View {
 
     private var cookieStatusWidget: some View {
         Button {
-            CookieManager.openSettings()
+            state.openSettings(tab: .cookies)
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: CookieManager.isConfiguredAndActive ? "shield.checkmark.fill" : "shield.slash.fill")
@@ -217,14 +243,14 @@ struct ContentView: View {
                 ProgressView().controlSize(.mini)
             } else {
                 Button {
-                    CookieManager.openSettings()
+                    state.openSettings(tab: .general)
                 } label: {
                     Image(systemName: "gearshape")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .help("Settings")
+                .help("Settings (⌘,)")
             }
         }
         .padding(.horizontal, 10)

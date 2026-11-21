@@ -20,8 +20,13 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
 struct SettingsView: View {
     @EnvironmentObject var tools: ToolManager
+    @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab
+
+    init(initialTab: SettingsTab = .general) {
+        _selectedTab = State(initialValue: initialTab)
+    }
 
     // General Settings
     @AppStorage("maxParallel") private var maxParallel = 3
@@ -39,6 +44,25 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header with Close Button
+            HStack {
+                Text("Settings")
+                    .font(.system(size: 16, weight: .bold))
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
             // Tab picker bar
             Picker("", selection: $selectedTab) {
                 ForEach(SettingsTab.allCases) { tab in
@@ -47,7 +71,6 @@ struct SettingsView: View {
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 20)
-            .padding(.top, 16)
             .padding(.bottom, 12)
 
             Divider()

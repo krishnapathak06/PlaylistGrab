@@ -169,7 +169,7 @@ struct NewDownloadView: View {
 
                 // Cookie Indicator Pill
                 Button {
-                    CookieManager.openSettings()
+                    state.openSettings(tab: .cookies)
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: CookieManager.isConfiguredAndActive ? "shield.checkmark" : "shield.slash")
@@ -302,7 +302,7 @@ struct NewDownloadView: View {
             HStack(spacing: 12) {
                 if isBot {
                     Button {
-                        CookieManager.openSettings()
+                        state.openSettings(tab: .cookies)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "gearshape.fill")

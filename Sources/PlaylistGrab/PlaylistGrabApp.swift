@@ -31,6 +31,12 @@ struct PlaylistGrabApp: App {
         }
         .commands {
             CommandGroup(replacing: .newItem) {}
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    state.openSettings(tab: .general)
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
         }
 
         Settings {

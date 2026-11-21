@@ -10,6 +10,15 @@ enum SidebarSection: Hashable {
 final class AppState: ObservableObject {
     @Published var section: SidebarSection? = .new
 
+    // Settings presentation
+    @Published var showSettings = false
+    @Published var settingsTab: SettingsTab = .cookies
+
+    func openSettings(tab: SettingsTab = .general) {
+        settingsTab = tab
+        showSettings = true
+    }
+
     // New download
     @Published var urlText = ""
     @Published var mode: MediaMode = .video

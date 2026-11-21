@@ -158,7 +158,7 @@ struct DownloadsView: View {
 
             HStack(spacing: 8) {
                 Button {
-                    CookieManager.openSettings()
+                    state.openSettings(tab: .cookies)
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: "gearshape.fill")
@@ -357,7 +357,7 @@ struct JobCard: View {
 
                         if isBotError {
                             Button {
-                                CookieManager.openSettings()
+                                state.openSettings(tab: .cookies)
                             } label: {
                                 Text("Open Settings → Cookies to Fix")
                                     .font(.system(size: 10, weight: .bold))
