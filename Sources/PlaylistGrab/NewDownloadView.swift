@@ -10,6 +10,7 @@ struct NewDownloadView: View {
     @AppStorage("cookieSource") private var cookieSource = CookieSourceType.browser.rawValue
 
     @State private var filterQuery = ""
+    @State private var rangeQuery = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -138,6 +139,49 @@ struct NewDownloadView: View {
                 .padding(3)
                 .background(Color.primary.opacity(0.05))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                // Quality Selector (Video resolution or Audio bitrate)
+                if state.mode == .video {
+                    HStack(spacing: 5) {
+                        Image(systemName: "sparkles.tv")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.primaryAccent)
+                        Picker("Quality", selection: $state.videoQuality) {
+                            ForEach(VideoQuality.allCases) { q in
+                                Text(q.displayName).tag(q)
+                            }
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .frame(width: 135)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.cardBorder, lineWidth: 1))
+                    .help("Download quality for all video files")
+                } else {
+                    HStack(spacing: 5) {
+                        Image(systemName: "waveform")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(Theme.primaryAccent)
+                        Picker("Quality", selection: $state.audioQuality) {
+                            ForEach(AudioQuality.allCases) { q in
+                                Text(q.displayName).tag(q)
+                            }
+                        }
+                        .labelsHidden()
+                        .controlSize(.small)
+                        .frame(width: 140)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.primary.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Theme.cardBorder, lineWidth: 1))
+                    .help("Audio bitrate for extracted MP3s")
+                }
 
                 // Subtitle toggle & picker (video only)
                 if state.mode == .video {
@@ -459,24 +503,27 @@ struct NewDownloadView: View {
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.cardBorder, lineWidth: 1))
                 }
 
-                // Batch Selection buttons
-                HStack(spacing: 6) {
-                    if state.downloadedEntriesCount > 0 {
-                        Button("Select Missing") { state.selectMissingOnly() }
+                // Batch Selection buttons (for single video or quick actions)
+                if !state.sourceIsPlaylist {
+                    HStack(spacing: 6) {
+                        Button("All") { state.setAllSelected(true) }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        Button("None") { state.setAllSelected(false) }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
                     }
-                    Button("All") { state.setAllSelected(true) }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    Button("None") { state.setAllSelected(false) }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(Color(nsColor: .controlBackgroundColor).opacity(0.6))
+
+            if state.sourceIsPlaylist {
+                Divider()
+                    .opacity(0.4)
+                rangeSelectionBar
+            }
 
             Divider()
                 .opacity(0.6)
@@ -486,7 +533,7 @@ struct NewDownloadView: View {
                 LazyVStack(spacing: 6) {
                     ForEach(state.entries.indices, id: \.self) { index in
                         if filterQuery.isEmpty || state.entries[index].title.localizedCaseInsensitiveContains(filterQuery) {
-                            VideoEntryRow(entry: $state.entries[index], isPlaylist: state.sourceIsPlaylist)
+                            VideoEntryRow(index: index, entry: $state.entries[index], isPlaylist: state.sourceIsPlaylist)
                         }
                     }
                 }
@@ -495,13 +542,167 @@ struct NewDownloadView: View {
         }
     }
 
+    // MARK: - Range Selection Bar
+
+    private enum RangeApplyMode {
+        case selectOnly, add, remove
+    }
+
+    private func applyRange(mode: RangeApplyMode) {
+        let matched = RangeParser.parse(rangeQuery, maxCount: state.entries.count)
+        guard !matched.isEmpty else { return }
+        switch mode {
+        case .selectOnly:
+            state.selectRangeOnly(matched)
+        case .add:
+            state.addRangeToSelection(matched)
+        case .remove:
+            state.removeRangeFromSelection(matched)
+        }
+    }
+
+    private var rangeSelectionBar: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: "list.number")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.primaryAccent)
+                Text("Select Range:")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+
+            HStack(spacing: 5) {
+                TextField("e.g. 2-9, 14, 15-23", text: $rangeQuery)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 11, design: .monospaced))
+                    .onSubmit {
+                        applyRange(mode: .selectOnly)
+                    }
+
+                if !rangeQuery.isEmpty {
+                    Button {
+                        rangeQuery = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .frame(minWidth: 160, maxWidth: 210)
+            .background(Color(nsColor: .textBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.cardBorder, lineWidth: 1))
+
+            let matched = RangeParser.parse(rangeQuery, maxCount: state.entries.count)
+
+            if !rangeQuery.trimmed.isEmpty {
+                Text("\(matched.count) matching")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(matched.isEmpty ? .secondary : Theme.primaryAccent)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Theme.primaryAccent.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+
+            Button {
+                applyRange(mode: .selectOnly)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "checkmark.circle")
+                    Text("Select Only")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Theme.primaryAccent)
+            .controlSize(.small)
+            .disabled(matched.isEmpty)
+            .help("Select ONLY the specified videos and uncheck the rest")
+
+            Button {
+                applyRange(mode: .add)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "plus")
+                    Text("Add")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(matched.isEmpty)
+            .help("Add the specified videos to your current selection")
+
+            Button {
+                applyRange(mode: .remove)
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "minus")
+                    Text("Deselect")
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(matched.isEmpty)
+            .help("Uncheck the specified videos so they won't be downloaded")
+
+            Spacer()
+
+            // Presets
+            HStack(spacing: 4) {
+                Button("Invert") {
+                    state.invertSelection()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Invert current selection")
+
+                if state.downloadedEntriesCount > 0 {
+                    Button("Missing") {
+                        state.selectMissingOnly()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .help("Select only videos not yet downloaded")
+                }
+
+                Button("All") {
+                    state.setAllSelected(true)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button("None") {
+                    state.setAllSelected(false)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.35))
+    }
+
     // MARK: - Bottom Floating Action Dock
 
     private var bottomBar: some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(state.selectedCount) of \(state.entries.count) Selected")
-                    .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 6) {
+                    Text("\(state.selectedCount) of \(state.entries.count) Selected")
+                        .font(.system(size: 13, weight: .semibold))
+
+                    Text("•")
+                        .foregroundStyle(.tertiary)
+
+                    Text(state.mode == .video ? state.videoQuality.displayName : state.audioQuality.displayName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Theme.primaryAccent)
+                }
 
                 if state.downloadedEntriesCount > 0 {
                     Text("\(state.downloadedEntriesCount) previously downloaded")
@@ -566,16 +767,23 @@ struct NewDownloadView: View {
 // MARK: - Video Entry Row Card
 
 struct VideoEntryRow: View {
+    @EnvironmentObject var state: AppState
+    let index: Int
     @Binding var entry: VideoEntry
     let isPlaylist: Bool
 
     @State private var isHovered = false
 
+    private func toggleSelection() {
+        let shiftHeld = NSEvent.modifierFlags.contains(.shift)
+        state.toggleEntrySelection(at: index, shiftHeld: shiftHeld)
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             // Checkbox
             Button {
-                entry.isSelected.toggle()
+                toggleSelection()
             } label: {
                 Image(systemName: entry.isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 16, weight: .semibold))
@@ -643,7 +851,7 @@ struct VideoEntryRow: View {
         )
         .contentShape(Rectangle())
         .onTapGesture {
-            entry.isSelected.toggle()
+            toggleSelection()
         }
         .onHover { hovering in
             isHovered = hovering

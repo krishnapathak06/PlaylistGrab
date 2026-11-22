@@ -14,6 +14,8 @@ final class DownloadJob: ObservableObject, Identifiable {
     let filePrefix: String
     let subtitleLanguage: String?
     let formatPreference: VideoFormatPreference
+    let videoQuality: VideoQuality
+    let audioQuality: AudioQuality
 
     @Published var state: State = .queued
     @Published var progress: Double = 0
@@ -32,13 +34,17 @@ final class DownloadJob: ObservableObject, Identifiable {
          directory: URL,
          filePrefix: String,
          subtitleLanguage: String?,
-         formatPreference: VideoFormatPreference) {
+         formatPreference: VideoFormatPreference,
+         videoQuality: VideoQuality = .q1080p,
+         audioQuality: AudioQuality = .best) {
         self.entry = entry
         self.mode = mode
         self.directory = directory
         self.filePrefix = filePrefix
         self.subtitleLanguage = subtitleLanguage
         self.formatPreference = formatPreference
+        self.videoQuality = videoQuality
+        self.audioQuality = audioQuality
     }
 
     var isActive: Bool { state == .running || state == .processing }
@@ -160,16 +166,31 @@ final class DownloadJob: ObservableObject, Identifiable {
 
         switch mode {
         case .audio:
-            args += ["-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", "0"]
+            args += ["-f", "bestaudio/best", "-x", "--audio-format", "mp3", "--audio-quality", audioQuality.rawValue]
         case .video:
-            switch formatPreference {
-            case .compatibleMP4:
-                args += [
-                    "-f", "bv*[vcodec^=avc1][height<=1080]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
-                    "--merge-output-format", "mp4",
-                ]
-            case .highestQuality:
-                args += ["-f", "bv*+ba/b", "--merge-output-format", "mkv"]
+            if let maxH = videoQuality.maxHeight {
+                switch formatPreference {
+                case .compatibleMP4:
+                    args += [
+                        "-f", "bv*[vcodec^=avc1][height<=\(maxH)]+ba[ext=m4a]/bv*[height<=\(maxH)]+ba/b[height<=\(maxH)]/b",
+                        "--merge-output-format", "mp4",
+                    ]
+                case .highestQuality:
+                    args += [
+                        "-f", "bv*[height<=\(maxH)]+ba/b[height<=\(maxH)]/b",
+                        "--merge-output-format", maxH > 1080 ? "mkv" : "mp4",
+                    ]
+                }
+            } else {
+                switch formatPreference {
+                case .compatibleMP4:
+                    args += [
+                        "-f", "bv*[vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4]/bv*+ba/b",
+                        "--merge-output-format", "mp4",
+                    ]
+                case .highestQuality:
+                    args += ["-f", "bv*+ba/b", "--merge-output-format", "mkv"]
+                }
             }
             if let lang = subtitleLanguage {
                 args += ["--write-subs", "--write-auto-subs", "--sub-langs", lang, "--convert-subs", "srt"]

@@ -32,6 +32,8 @@ struct SettingsView: View {
     @AppStorage("maxParallel") private var maxParallel = 3
     @AppStorage("downloadFolder") private var downloadFolder = AppDefaults.downloadFolder
     @AppStorage("videoFormat") private var videoFormat = VideoFormatPreference.compatibleMP4.rawValue
+    @AppStorage("videoQuality") private var defaultVideoQuality = VideoQuality.q1080p.rawValue
+    @AppStorage("audioQuality") private var defaultAudioQuality = AudioQuality.best.rawValue
     @AppStorage("autoUpdateYTDLP") private var autoUpdate = true
 
     // Cookies Settings
@@ -147,6 +149,36 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+            }
+
+            // Default Video Quality
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Default Video Quality")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Picker("", selection: $defaultVideoQuality) {
+                    ForEach(VideoQuality.allCases) { q in
+                        Text(q.displayName).tag(q.rawValue)
+                    }
+                }
+                .labelsHidden()
+
+                Text("Videos will download up to this resolution by default. You can also adjust this directly on the New Download screen before starting.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Default Audio Quality
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Default Audio Quality")
+                    .font(.system(size: 13, weight: .semibold))
+
+                Picker("", selection: $defaultAudioQuality) {
+                    ForEach(AudioQuality.allCases) { q in
+                        Text(q.displayName).tag(q.rawValue)
+                    }
+                }
+                .labelsHidden()
             }
 
             // Video Format

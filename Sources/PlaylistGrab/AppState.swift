@@ -22,6 +22,22 @@ final class AppState: ObservableObject {
     // New download
     @Published var urlText = ""
     @Published var mode: MediaMode = .video
+    @Published var videoQuality: VideoQuality = {
+        let raw = UserDefaults.standard.string(forKey: "videoQuality") ?? VideoQuality.q1080p.rawValue
+        return VideoQuality(rawValue: raw) ?? .q1080p
+    }() {
+        didSet {
+            UserDefaults.standard.set(videoQuality.rawValue, forKey: "videoQuality")
+        }
+    }
+    @Published var audioQuality: AudioQuality = {
+        let raw = UserDefaults.standard.string(forKey: "audioQuality") ?? AudioQuality.best.rawValue
+        return AudioQuality(rawValue: raw) ?? .best
+    }() {
+        didSet {
+            UserDefaults.standard.set(audioQuality.rawValue, forKey: "audioQuality")
+        }
+    }
     @Published var entries: [VideoEntry] = []
     @Published var sourceTitle = ""
     @Published var sourceIsPlaylist = false
@@ -36,6 +52,7 @@ final class AppState: ObservableObject {
     @Published var revision = 0
 
     private var sourceTotal = 0
+    private(set) var lastClickedIndex: Int?
 
     var selectedCount: Int { entries.filter { $0.isSelected }.count }
     var hasFinishedJobs: Bool { jobs.contains { $0.isFinished } }
@@ -59,6 +76,7 @@ final class AppState: ObservableObject {
         fetchError = nil
         hasSource = false
         entries = []
+        lastClickedIndex = nil
 
         Task {
             do {
@@ -85,6 +103,48 @@ final class AppState: ObservableObject {
     func selectMissingOnly() {
         for i in entries.indices {
             entries[i].isSelected = !entries[i].isDownloaded
+        }
+    }
+
+    func selectRangeOnly(_ indices: Set<Int>) {
+        for i in entries.indices {
+            entries[i].isSelected = indices.contains(entries[i].index)
+        }
+    }
+
+    func addRangeToSelection(_ indices: Set<Int>) {
+        for i in entries.indices {
+            if indices.contains(entries[i].index) {
+                entries[i].isSelected = true
+            }
+        }
+    }
+
+    func removeRangeFromSelection(_ indices: Set<Int>) {
+        for i in entries.indices {
+            if indices.contains(entries[i].index) {
+                entries[i].isSelected = false
+            }
+        }
+    }
+
+    func invertSelection() {
+        for i in entries.indices {
+            entries[i].isSelected.toggle()
+        }
+    }
+
+    func toggleEntrySelection(at index: Int, shiftHeld: Bool) {
+        guard index >= 0 && index < entries.count else { return }
+        if shiftHeld, let last = lastClickedIndex, last >= 0 && last < entries.count {
+            let targetState = entries[last].isSelected
+            let range = min(last, index)...max(last, index)
+            for i in range {
+                entries[i].isSelected = targetState
+            }
+        } else {
+            entries[index].isSelected.toggle()
+            lastClickedIndex = index
         }
     }
 
@@ -154,7 +214,9 @@ final class AppState: ObservableObject {
                 directory: directory,
                 filePrefix: prefix,
                 subtitleLanguage: wantsSubtitles ? language : nil,
-                formatPreference: preference))
+                formatPreference: preference,
+                videoQuality: videoQuality,
+                audioQuality: audioQuality))
         }
 
         section = .downloads

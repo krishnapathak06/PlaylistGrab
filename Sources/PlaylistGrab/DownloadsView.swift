@@ -400,13 +400,18 @@ struct JobCard: View {
                 )
                 .frame(width: 38, height: 38)
 
-            Image(systemName: job.mode == .audio ? "waveform" : "film.fill")
-                .font(.system(size: 15))
-                .foregroundStyle(
-                    job.mode == .audio
-                        ? Theme.primaryAccent
-                        : Color.blue
-                )
+            VStack(spacing: 1) {
+                Image(systemName: job.mode == .audio ? "waveform" : "film.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(
+                        job.mode == .audio
+                            ? Theme.primaryAccent
+                            : Color.blue
+                    )
+                Text(job.mode == .audio ? job.audioQuality.shortLabel : job.videoQuality.shortLabel)
+                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                    .foregroundStyle(job.mode == .audio ? Theme.primaryAccent : Color.blue)
+            }
         }
     }
 
